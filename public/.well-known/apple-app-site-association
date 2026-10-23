@@ -1,0 +1,7 @@
+{
+  "applinks": {
+    "details": [
+      { "appIDs": ["APPLE_TEAM_ID.com.ridetogether.app"], "components": [{ "/": "/j/*" }] }
+    ]
+  }
+}

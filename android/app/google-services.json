@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "753131910164",
+    "project_id": "ridetogether-4590",
+    "storage_bucket": "ridetogether-4590.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753131910164:android:7f8b2004a3f4c1115e2301",
+        "android_client_info": {
+          "package_name": "com.ridetogether.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753131910164-9hlo7p7lvpft3osipdnndadavelil7id.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ridetogether.app",
+            "certificate_hash": "d33c93b42da06d525e9a29e63ee3cac7128d5e18"
+          }
+        },
+        {
+          "client_id": "753131910164-2httedpvdp4pk01g76611k8kks12rakj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUwUEtd2hcvVsqM5_t8d9s0Ruvgzkc0KQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753131910164-2httedpvdp4pk01g76611k8kks12rakj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "753131910164-mftrujnm81n36kuga34i9gpor0jaj71o.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ridetogether.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

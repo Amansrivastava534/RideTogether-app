@@ -1,0 +1,178 @@
+rules_version = '2';
+
+// RideTogether authorization. The app never relies on client-side checks:
+// everything below is what actually protects locations.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function ridePath(rideId) { return /databases/$(db)/documents/rides/$(rideId); }
+    function memberPath(rideId, uid) { return /databases/$(db)/documents/rides/$(rideId)/members/$(uid); }
+    function rideData(rideId) { return get(ridePath(rideId)).data; }
+
+    function isActiveMember(rideId) {
+      return signedIn()
+        && exists(memberPath(rideId, me()))
+        && get(memberPath(rideId, me())).data.status == 'active';
+    }
+    function isOwner(rideId) { return signedIn() && rideData(rideId).ownerId == me(); }
+
+    function isTs(v) { return v is timestamp; }
+    function shortString(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
+    function optString(m, k, max) { return !(k in m) || m[k] == null || (m[k] is string && m[k].size() <= max); }
+    function expiresWithin(v, d) { return isTs(v) && v > request.time && v <= request.time + d; }
+
+    // ---------------------------------------------------------------- users
+    // Private: profile, FCM tokens, history, recent rides. Only the user.
+    match /users/{uid} {
+      allow read, delete: if signedIn() && me() == uid;
+      allow create, update: if signedIn() && me() == uid
+        && request.resource.data.keys().hasOnly(['name', 'photoUrl', 'bikeName', 'historyConsent', 'fcmTokens', 'updatedAt'])
+        && shortString(request.resource.data.name, 40)
+        && optString(request.resource.data, 'bikeName', 40)
+        && optString(request.resource.data, 'photoUrl', 2048);
+      match /{sub=**} {
+        allow read, write: if signedIn() && me() == uid;
+      }
+    }
+
+    // -------------------------------------------------------------- invites
+    // Knowing the 8-char code is the capability to *request* membership.
+    // `get` only — codes cannot be listed/enumerated.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && code.size() == 8
+        && request.resource.data.keys().hasOnly(['rideId', 'rideName', 'requireApproval', 'createdBy', 'expireAt'])
+        && request.resource.data.createdBy == me()
+        && getAfter(ridePath(request.resource.data.rideId)).data.ownerId == me()
+        && getAfter(ridePath(request.resource.data.rideId)).data.code == code
+        && request.resource.data.requireApproval is bool
+        && expiresWithin(request.resource.data.expireAt, duration.value(2, 'd'));
+      allow update: if signedIn() && resource.data.createdBy == me()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['requireApproval'])
+        && request.resource.data.requireApproval is bool;
+      allow delete: if signedIn() && resource.data.createdBy == me();
+    }
+
+    // ---------------------------------------------------------------- rides
+    match /rides/{rideId} {
+      // Pending members may read ride metadata (name) but nothing else.
+      allow get: if signedIn() && (resource.data.ownerId == me() || exists(memberPath(rideId, me())));
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'ownerId', 'code', 'requireApproval', 'status', 'createdAt',
+                                                 'fallBehindMeters', 'expireAt'])
+        && request.resource.data.ownerId == me()
+        && request.resource.data.status == 'waiting'
+        && shortString(request.resource.data.name, 60)
+        && request.resource.data.code is string && request.resource.data.code.size() == 8
+        && request.resource.data.requireApproval is bool
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.fallBehindMeters is number
+        && isTs(request.resource.data.expireAt);
+
+      // Owner only; ended rides are frozen; status only moves forward.
+      allow update: if signedIn()
+        && resource.data.ownerId == me()
+        && resource.data.status != 'ended'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'startedAt', 'endedAt', 'requireApproval', 'fallBehindMeters', 'code'])
+        && (request.resource.data.status == resource.data.status
+            || (resource.data.status == 'waiting' && request.resource.data.status in ['active', 'ended'])
+            || (resource.data.status == 'active' && request.resource.data.status == 'ended'))
+        && request.resource.data.requireApproval is bool
+        && request.resource.data.fallBehindMeters is number
+        && request.resource.data.fallBehindMeters >= 200 && request.resource.data.fallBehindMeters <= 50000;
+      allow delete: if false;
+
+      // ------------------------------------------------------------ members
+      match /members/{uid} {
+        allow read: if isActiveMember(rideId) || (signedIn() && uid == me());
+
+        allow create: if signedIn() && uid == me()
+          && request.resource.data.keys().hasOnly(['name', 'photoUrl', 'bikeName', 'role', 'status', 'joinedAt',
+                                                   'expireAt', 'inviteCode'])
+          && shortString(request.resource.data.name, 40)
+          && optString(request.resource.data, 'bikeName', 40)
+          && optString(request.resource.data, 'photoUrl', 2048)
+          && request.resource.data.joinedAt == request.time
+          && isTs(request.resource.data.expireAt)
+          && (
+            // Owner bootstrap, in the same batch that creates the ride.
+            (getAfter(ridePath(rideId)).data.ownerId == me()
+              && request.resource.data.role == 'owner'
+              && request.resource.data.status == 'active')
+            ||
+            // Joiner: must hold a valid, unexpired invite for THIS ride, and
+            // the status must match the ride's real approval setting.
+            (request.resource.data.role == 'member'
+              && request.resource.data.inviteCode is string
+              && request.resource.data.inviteCode.size() == 8
+              && exists(/databases/$(db)/documents/invites/$(request.resource.data.inviteCode))
+              && get(/databases/$(db)/documents/invites/$(request.resource.data.inviteCode)).data.rideId == rideId
+              && get(/databases/$(db)/documents/invites/$(request.resource.data.inviteCode)).data.expireAt > request.time
+              && rideData(rideId).status != 'ended'
+              && request.resource.data.status == (rideData(rideId).requireApproval ? 'pending' : 'active'))
+          );
+
+        allow update: if signedIn() && (
+            // Owner approves or removes someone else.
+            (uid != me() && isOwner(rideId)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+              && request.resource.data.status in ['active', 'removed'])
+            ||
+            // A member edits their own display fields only.
+            (uid == me()
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoUrl', 'bikeName'])
+              && shortString(request.resource.data.name, 40)));
+
+        // Leave (self). Removed members can't delete their tombstone to rejoin;
+        // the owner can't leave (they end the ride instead).
+        allow delete: if signedIn() && uid == me()
+          && resource.data.status != 'removed' && resource.data.role != 'owner';
+      }
+
+      // ---------------------------------------------------------- locations
+      // One document per rider = latest position only.
+      match /locations/{uid} {
+        allow read: if isActiveMember(rideId);
+
+        allow create, update: if signedIn() && uid == me()
+          && isActiveMember(rideId)
+          && rideData(rideId).status != 'ended'
+          && request.resource.data.keys().hasOnly(['lat', 'lng', 'accuracy', 'speed', 'heading', 'clientTs',
+                                                   'serverTs', 'sharing', 'expireAt'])
+          && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+          && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+          && request.resource.data.accuracy is number && request.resource.data.accuracy >= 0
+          && (request.resource.data.speed == null || request.resource.data.speed is number)
+          && (request.resource.data.heading == null || request.resource.data.heading is number)
+          && request.resource.data.sharing is bool
+          && request.resource.data.serverTs == request.time
+          && isTs(request.resource.data.clientTs)
+          && request.resource.data.clientTs < request.time + duration.value(5, 'm')
+          // Out-of-order protection: never replace a newer fix with an older one.
+          && (resource == null || request.resource.data.clientTs > resource.data.clientTs)
+          && expiresWithin(request.resource.data.expireAt, duration.value(2, 'd'));
+
+        allow delete: if signedIn() && (uid == me() || isOwner(rideId));
+      }
+
+      // ------------------------------------------------------------- alerts
+      match /alerts/{alertId} {
+        allow read: if isActiveMember(rideId);
+        allow create: if isActiveMember(rideId)
+          && request.resource.data.keys().hasOnly(['type', 'uid', 'name', 'lat', 'lng', 'createdAt', 'expireAt'])
+          && request.resource.data.type == 'sos'
+          && request.resource.data.uid == me()
+          && shortString(request.resource.data.name, 40)
+          && request.resource.data.createdAt == request.time
+          && isTs(request.resource.data.expireAt);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

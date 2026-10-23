@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ridetogether.app",
+      "sha256_cert_fingerprints": [
+        "ED:10:85:01:E1:20:8A:63:AB:18:3A:35:91:7E:88:64:B3:08:21:F8:BB:16:03:CE:75:C5:BC:BA:A5:DE:C6:92"
+      ]
+    }
+  }
+]
