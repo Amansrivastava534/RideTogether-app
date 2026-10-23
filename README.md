@@ -311,6 +311,14 @@ Function trigger smoke test (emulator; no real FCM delivery):
 firebase emulators:exec --only firestore,functions --project demo-ridetogether "node firestore-tests/fn-smoke.mjs"
 ```
 
+**Regenerating the app icon** (orange background + white bike, same glyph as the splash) — writes all Android mipmaps and iOS AppIcon PNGs:
+
+```bash
+FLUTTER_ROOT=$(dirname $(dirname $(readlink -f $(which flutter)))) flutter test tool/generate_icons.dart
+```
+
+Then strip alpha from the iOS PNGs (App Store rejects icons with an alpha channel), e.g. round-trip each through JPEG with `sips`.
+
 **Simulating movement on the Android emulator**: `adb emu geo fix <lng> <lat> 0 8 <knots>` (the velocity argument makes the rider show as *Moving*; `geo nmea` is ignored by current emulators).
 
 ---
