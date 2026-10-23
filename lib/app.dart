@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/splash.dart';
 import 'core/ui.dart';
 import 'domain/ride_logic.dart';
 import 'features/auth/sign_in_screen.dart';
@@ -25,6 +26,15 @@ class RideTogetherApp extends ConsumerWidget {
       // arrive as route names via Flutter's built-in deep linking.
       onGenerateInitialRoutes: (name) => [_route('/')!, if (_route(name) case final r? when name != '/') r],
       onGenerateRoute: (s) => _route(s.name ?? '/'),
+      // Animated splash over whatever route opened (home or an invite link),
+      // held until sign-in state (and the profile, if signed in) is known.
+      builder: (context, child) => Consumer(
+        builder: (context, ref, _) {
+          final user = ref.watch(authUserProvider);
+          final ready = !user.isLoading && (user.value == null || !ref.watch(profileProvider).isLoading);
+          return SplashOverlay(ready: ready, child: child!);
+        },
+      ),
     );
   }
 
