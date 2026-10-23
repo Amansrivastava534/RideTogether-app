@@ -52,3 +52,4 @@ ui-debug.log
 
 # Secrets (Maps key) — read by Gradle
 .env
+/dist/
