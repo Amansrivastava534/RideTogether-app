@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -167,15 +168,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onSelectionChanged: (s) => ref.read(settingsProvider.notifier).setThemeMode(s.first),
               ),
             ),
-            SwitchListTile(
-              title: const Text('Keep sharing in the background'),
-              subtitle: const Text(
-                'Shows a persistent notification on Android. If off, others will see you as '
-                '“Location unavailable” while the app is not open. Applies the next time you start sharing.',
+            if (!kIsWeb)
+              SwitchListTile(
+                title: const Text('Keep sharing in the background'),
+                subtitle: const Text(
+                  'Shows a persistent notification on Android. If off, others will see you as '
+                  '“Location unavailable” while the app is not open. Applies the next time you start sharing.',
+                ),
+                value: settings.backgroundSharing,
+                onChanged: ref.read(settingsProvider.notifier).setBackgroundSharing,
               ),
-              value: settings.backgroundSharing,
-              onChanged: ref.read(settingsProvider.notifier).setBackgroundSharing,
-            ),
             SwitchListTile(
               title: const Text('Save my routes (ride history)'),
               subtitle: Text('Only you can see them. Auto-deleted after ${RideConfig.historyTtl.inDays} days.'),

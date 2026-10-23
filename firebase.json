@@ -1,1 +1,110 @@
-{"firestore":{"database":"(default)","location":"asia-south1","rules":"firestore.rules","indexes":"firestore.indexes.json"},"functions":[{"source":"functions","codebase":"default","ignore":["node_modules","*.test.js"]}],"hosting":{"public":"public","ignore":["firebase.json","**/node_modules/**"],"rewrites":[{"source":"/j/**","destination":"/j/index.html"}],"headers":[{"source":"/.well-known/apple-app-site-association","headers":[{"key":"Content-Type","value":"application/json"}]}]},"emulators":{"auth":{"port":9099},"firestore":{"port":8080},"functions":{"port":5001},"ui":{"enabled":false},"singleProjectMode":true},"flutter":{"platforms":{"android":{"default":{"projectId":"ridetogether-4590","appId":"1:753131910164:android:7f8b2004a3f4c1115e2301","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"ridetogether-4590","appId":"1:753131910164:ios:e71145a0edebf70d5e2301","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"ridetogether-4590","configurations":{"android":"1:753131910164:android:7f8b2004a3f4c1115e2301","ios":"1:753131910164:ios:e71145a0edebf70d5e2301"}}}}}}
+{
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        "*.test.js"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "build/web",
+    "predeploy": [
+      "flutter build web --release --dart-define-from-file=.env"
+    ],
+    "ignore": [
+      "firebase.json",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      },
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/flutter_bootstrap.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true,
+    "hosting": {
+      "port": 5050
+    }
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "ridetogether-4590",
+          "appId": "1:753131910164:android:7f8b2004a3f4c1115e2301",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "ridetogether-4590",
+          "appId": "1:753131910164:ios:e71145a0edebf70d5e2301",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "ridetogether-4590",
+          "configurations": {
+            "android": "1:753131910164:android:7f8b2004a3f4c1115e2301",
+            "ios": "1:753131910164:ios:e71145a0edebf70d5e2301",
+            "web": "1:753131910164:web:7af5a983d6eb633e5e2301"
+          }
+        }
+      }
+    }
+  }
+}

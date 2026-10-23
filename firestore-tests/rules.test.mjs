@@ -221,6 +221,15 @@ describe('ending a ride', () => {
     await assertFails(updateDoc(doc(db('owner'), 'rides', RIDE), { status: 'waiting' }));
     await assertSucceeds(updateDoc(doc(db('owner'), 'rides', RIDE), { status: 'ended', endedAt: serverTimestamp() }));
   });
+  test('owner ends ride and revokes its invite in one batch', async () => {
+    const f = db('owner');
+    const b = writeBatch(f);
+    b.update(doc(f, 'rides', RIDE), { status: 'ended', endedAt: serverTimestamp() });
+    b.delete(doc(f, 'invites', CODE));
+    await assertSucceeds(b.commit());
+    await assertSucceeds(getDoc(doc(db('carol'), 'invites', CODE))); // readable, just missing
+    await assertFails(join('carol', 'pending'));
+  });
   test('after end: no location writes, no new joins, ride frozen', async () => {
     await updateDoc(doc(db('owner'), 'rides', RIDE), { status: 'ended', endedAt: serverTimestamp() });
     await assertFails(setDoc(doc(db('bob'), `rides/${RIDE}/locations/bob`), loc(26.1)));

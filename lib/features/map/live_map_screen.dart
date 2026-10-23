@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -194,7 +195,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
       final l = locs[m.uid];
       if (!m.isActive || l == null) continue;
       // Our own position is the blue dot when permission allows it.
-      if (m.uid == me && _locationGranted) continue;
+      if (m.uid == me && _locationGranted && !kIsWeb) continue;
       final status = statusOf(l, now);
       final live = status.isLive;
       final heading = live ? l.heading : null;
@@ -280,7 +281,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
               },
               style: dark ? _darkMapStyle : null,
               markers: _markers(active, locs, now, me),
-              myLocationEnabled: _locationGranted,
+              myLocationEnabled: _locationGranted && !kIsWeb,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
@@ -295,6 +296,11 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
                   if (locData?.fromCache ?? false)
                     const _Banner(icon: Icons.cloud_off, text: 'Offline — showing last known positions'),
                   if (tracking.error != null) _Banner(icon: Icons.gps_off, text: tracking.error!),
+                  if (kIsWeb && tracking.isSharing)
+                    const _Banner(
+                      icon: Icons.phone_iphone,
+                      text: 'Keep this page open — sharing pauses if you lock the phone or switch apps.',
+                    ),
                   for (final uid in _banners)
                     _Banner(
                       icon: Icons.warning_amber,

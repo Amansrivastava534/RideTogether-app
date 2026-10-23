@@ -16,10 +16,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -62,5 +59,13 @@ class DefaultFirebaseOptions {
     androidClientId: '753131910164-9hlo7p7lvpft3osipdnndadavelil7id.apps.googleusercontent.com',
     iosClientId: '753131910164-mftrujnm81n36kuga34i9gpor0jaj71o.apps.googleusercontent.com',
     iosBundleId: 'com.ridetogether.app',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBoOG3wzoCFHNPbTc4IVsactIUTBQSpCK4',
+    appId: '1:753131910164:web:7af5a983d6eb633e5e2301',
+    messagingSenderId: '753131910164',
+    projectId: 'ridetogether-4590',
+    authDomain: 'ridetogether-4590.firebaseapp.com',
+    storageBucket: 'ridetogether-4590.firebasestorage.app',
   );
 }

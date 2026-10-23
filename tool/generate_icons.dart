@@ -68,6 +68,14 @@ void main() {
       for (final MapEntry(key: name, value: px) in sizes.entries) {
         await _render('$ios/Icon-App-$name.png', px, glyph: 0.66, radius: 0);
       }
+      // Web / PWA (iPhone "Add to Home Screen" uses apple-touch-icon).
+      await _render('web/icons/apple-touch-icon.png', 180, glyph: 0.66, radius: 0);
+      await _render('web/icons/Icon-192.png', 192, glyph: 0.66, radius: 0.22);
+      await _render('web/icons/Icon-512.png', 512, glyph: 0.66, radius: 0.22);
+      // Maskable: full bleed, bike inside the 80% safe circle.
+      await _render('web/icons/Icon-maskable-192.png', 192, glyph: 0.5, radius: 0);
+      await _render('web/icons/Icon-maskable-512.png', 512, glyph: 0.5, radius: 0);
+      await _render('web/favicon.png', 32, glyph: 0.78, radius: 0.22);
     });
   });
 }

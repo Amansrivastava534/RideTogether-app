@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../domain/models.dart';
@@ -19,7 +20,10 @@ class UserRepository {
 
   Stream<User?> authChanges() => _auth.authStateChanges();
 
-  Future<void> signInWithGoogle() async => _auth.signInWithCredential(await _googleCredential());
+  /// Web uses a full-page redirect: popups are unreliable in an iPhone
+  /// home-screen web app. The result arrives via [authChanges].
+  Future<void> signInWithGoogle() async =>
+      kIsWeb ? _auth.signInWithRedirect(GoogleAuthProvider()) : _auth.signInWithCredential(await _googleCredential());
 
   Future<AuthCredential> _googleCredential() async {
     final gsi = GoogleSignIn.instance;
@@ -50,6 +54,9 @@ class UserRepository {
   /// Stores the FCM token so Cloud Functions can push SOS / join requests.
   /// Tokens live on the private user doc, never on member docs.
   Future<void> registerPushToken(String uid) async {
+    // ponytail: no web push (needs a VAPID key + service worker); web users
+    // get SOS/join alerts in-app while the page is open.
+    if (kIsWeb) return;
     final fcm = FirebaseMessaging.instance;
     await fcm.requestPermission();
     // ponytail: classic registration token (deprecated in favour of FID
@@ -107,7 +114,9 @@ class UserRepository {
       if (e.code != 'requires-recent-login') rethrow;
       if (user.isAnonymous) rethrow;
       // Re-authenticate the same user (a different Google account fails).
-      await user.reauthenticateWithCredential(await _googleCredential());
+      kIsWeb
+          ? await user.reauthenticateWithPopup(GoogleAuthProvider())
+          : await user.reauthenticateWithCredential(await _googleCredential());
       await user.delete();
     }
     if (_googleReady) await GoogleSignIn.instance.signOut();

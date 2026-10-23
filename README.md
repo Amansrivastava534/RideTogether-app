@@ -19,6 +19,7 @@ Firebase project: **`ridetogether-4590`** (personal account `amansrivastava4590@
 - [Deploy](#deploy)
 - [Tests](#tests)
 - [iOS](#ios)
+- [iPhone without the App Store (web app)](#iphone-without-the-app-store-web-app)
 - [Two-phone testing checklist](#two-phone-testing-checklist)
 - [Status & known limitations](#status--known-limitations)
 
@@ -45,7 +46,7 @@ lib/
 firestore.rules                authorization (the real security boundary)
 firestore.indexes.json         TTL policies (retention)
 functions/                     push notifications only (SOS, join requests)
-public/                        Hosting: invite page /j/CODE, privacy page, App Link / Universal Link files
+web/                           web app (PWA): index.html, manifest, icons, privacy page, App Link / Universal Link files
 firestore-tests/               security-rules integration tests (emulator)
 ```
 
@@ -229,7 +230,7 @@ keyAlias=upload
 keyPassword=…
 ```
 
-Add the new key's SHA-1/SHA-256 to Firebase and to the Maps key restriction, and its SHA-256 to `public/.well-known/assetlinks.json`.
+Add the new key's SHA-1/SHA-256 to Firebase and to the Maps key restriction, and its SHA-256 to `web/.well-known/assetlinks.json`.
 
 ---
 
@@ -275,13 +276,13 @@ Needs Blaze (push notifications for SOS and join requests):
 firebase deploy --only functions
 ```
 
-Invite page, privacy page, App Link / Universal Link files:
+Web app (PWA), invite links, privacy page, App Link / Universal Link files (builds the web app first):
 
 ```bash
 firebase deploy --only hosting
 ```
 
-Before deploying hosting, set the real values in `public/.well-known/assetlinks.json` (release SHA-256) and `public/.well-known/apple-app-site-association` (replace `APPLE_TEAM_ID`). Until hosting is deployed, invite links still carry the code, which can be typed in *Join ride*.
+For release builds, set the real values in `web/.well-known/assetlinks.json` (release SHA-256) and `web/.well-known/apple-app-site-association` (replace `APPLE_TEAM_ID`).
 
 `functions/` pins `firebase-functions@6` because the installed firebase-tools (14.17) can't load v7 in the emulator; upgrade both together.
 
@@ -342,6 +343,35 @@ Background location, push and Universal Links need a **physical iPhone**. iOS ma
 
 ---
 
+## iPhone without the App Store (web app)
+
+The same Flutter code is deployed as a **web app (PWA)** at **https://ridetogether-4590.web.app** — free, no Apple Developer account. iPhone users open it in **Safari → Share → Add to Home Screen** and get a RideTogether icon that opens full screen. Invite links (`/j/CODE`) open the Join screen directly; Android users with the app installed are sent to the app instead (App Links).
+
+What differs from the native apps:
+
+- Location is shared **only while the page is open**. The screen is kept awake while sharing (Screen Wake Lock); locking the phone or switching apps pauses updates and friends see *Location unavailable / Last seen*.
+- No push notifications (SOS and join requests appear in-app while open).
+- Google sign-in uses a full-page redirect on the same domain (Safari-safe); guests work as usual.
+- Your own position is drawn as your marker (no native blue dot).
+
+Setup: enable **Maps JavaScript API**, create a key restricted to *Websites* `https://ridetogether-4590.web.app/*`, `https://ridetogether-4590.firebaseapp.com/*`, `http://localhost/*` and API *Maps JavaScript API*, then:
+
+```bash
+echo "MAPS_WEB_API_KEY=YOUR_WEB_KEY" >> .env
+```
+
+Deploy (the `predeploy` hook runs `flutter build web --release --dart-define-from-file=.env`):
+
+```bash
+firebase deploy --only hosting
+```
+
+Local preview with the same rewrites (port 5050):
+
+```bash
+firebase emulators:start --only hosting
+```
+
 ## Two-phone testing checklist
 
 Use two real phones (A = owner, B = joiner), both on the same release build. Tick each box.
@@ -393,7 +423,7 @@ Verified so far (Oct 2026): unit tests (30) and rules tests (23) pass; Android r
 
 Not yet verified / pending:
 - Blaze plan → TTL policies and Cloud Functions (push) are written and emulator-tested but **not deployed**.
-- Hosting (invite page, App Links) not deployed; links work only after `firebase deploy --only hosting` with the real SHA-256 / Team ID.
+- Web app deployed to https://ridetogether-4590.web.app; the map needs `MAPS_WEB_API_KEY` in `.env` and a redeploy. Location sharing in a real iPhone Safari not yet verified.
 - Release signing uses the debug key until `android/key.properties` is set up.
 - iOS not built (no Xcode on the dev Mac).
 - Two real phones riding apart, background delivery with screen off, SOS push — use the checklist above.

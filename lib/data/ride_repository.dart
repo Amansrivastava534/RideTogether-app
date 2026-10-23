@@ -89,7 +89,11 @@ class RideRepository {
 
   Future<RideInvitation> lookupInvite(String code) async {
     final snap = await _invite(code).get();
-    if (!snap.exists) throw const RideException('No ride found for that code');
+    if (!snap.exists) {
+      throw const RideException(
+        'No active ride uses that code. The ride may have ended, or the owner made a new code.',
+      );
+    }
     final inv = RideInvitation.fromMap(code, snap.data()!);
     if (inv.isExpired(DateTime.now())) {
       throw const RideException('This invitation has expired. Ask the ride owner for a new code.');
@@ -128,7 +132,9 @@ class RideRepository {
           .commit();
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {
-        throw const RideException('Could not join. The ride may have ended or the code was changed.');
+        throw const RideException(
+          'Could not join: this ride has ended or the code was replaced. Ask the owner for a new invite.',
+        );
       }
       rethrow;
     }
@@ -224,8 +230,13 @@ class RideRepository {
   Future<void> startRide(String rideId) =>
       _ride(rideId).update({'status': RideStatus.active.name, 'startedAt': FieldValue.serverTimestamp()});
 
-  Future<void> endRide(String rideId) =>
-      _ride(rideId).update({'status': RideStatus.ended.name, 'endedAt': FieldValue.serverTimestamp()});
+  /// Ends the ride and revokes its invite in one batch, so the old code
+  /// can't even be looked up any more.
+  Future<void> endRide(Ride ride) =>
+      (_db.batch()
+            ..update(_ride(ride.id), {'status': RideStatus.ended.name, 'endedAt': FieldValue.serverTimestamp()})
+            ..delete(_invite(ride.code)))
+          .commit();
 
   Future<void> approve(String rideId, String uid) =>
       _members(rideId).doc(uid).update({'status': MemberStatus.active.name});

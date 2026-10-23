@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -23,13 +24,13 @@ Future<void> startSharingFlow(BuildContext context, WidgetRef ref, String rideId
       context,
       'Turn on location',
       'GPS is off. Turn on location services to share where you are.',
-      'Open settings',
+      kIsWeb ? 'OK' : 'Open settings',
     );
-    if (open) await Geolocator.openLocationSettings();
+    if (open && !kIsWeb) await Geolocator.openLocationSettings();
     return;
   }
   if (access == LocationAccess.denied) {
-    final bg = ref.read(settingsProvider).backgroundSharing;
+    final bg = !kIsWeb && ref.read(settingsProvider).backgroundSharing;
     final ok = await _ask(
       context,
       'Share your location with this ride',
@@ -37,6 +38,8 @@ Future<void> startSharingFlow(BuildContext context, WidgetRef ref, String rideId
           'including how far apart you are.\n\n'
           '${bg ? 'Sharing continues while your screen is off or you use other apps, until you pause, stop or leave the ride. '
                     'Android shows a notification while this is on; iOS shows a blue location indicator.\n\n' : ''}'
+          '${kIsWeb ? 'In the browser, sharing works while this page is open: your screen stays on while sharing. '
+                    'Locking the phone or switching apps pauses it.\n\n' : ''}'
           'Only active members of this ride can see it.',
       'Continue',
     );
@@ -48,10 +51,13 @@ Future<void> startSharingFlow(BuildContext context, WidgetRef ref, String rideId
     final open = await _ask(
       context,
       'Location permission needed',
-      'Location access is turned off for RideTogether. Enable it in Settings to share your position.',
-      'Open settings',
+      kIsWeb
+          ? 'Location is blocked for this site. On iPhone: Settings → Privacy & Security → Location Services → '
+                'Safari Websites → While Using, then reload. In other browsers allow location in the address bar.'
+          : 'Location access is turned off for RideTogether. Enable it in Settings to share your position.',
+      kIsWeb ? 'OK' : 'Open settings',
     );
-    if (open) await Geolocator.openAppSettings();
+    if (open && !kIsWeb) await Geolocator.openAppSettings();
     return;
   }
   await tracking.startSharing(rideId);
@@ -106,7 +112,7 @@ Future<void> confirmEnd(BuildContext context, WidgetRef ref, Ride ride) async {
   );
   if (!ok || !context.mounted) return;
   try {
-    await ref.read(rideRepoProvider).endRide(ride.id);
+    await ref.read(rideRepoProvider).endRide(ride);
     // RideScope reacts to the ended status and shows the summary.
   } catch (e) {
     if (context.mounted) showSnack(context, friendlyError(e));

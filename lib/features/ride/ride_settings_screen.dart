@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -86,12 +87,13 @@ class RideSettingsScreen extends ConsumerWidget {
             ],
             const Divider(),
             const ListTile(title: Text('Location')),
-            SwitchListTile(
-              title: const Text('Keep sharing in the background'),
-              subtitle: const Text('Takes effect next time you start sharing.'),
-              value: settings.backgroundSharing,
-              onChanged: ref.read(settingsProvider.notifier).setBackgroundSharing,
-            ),
+            if (!kIsWeb)
+              SwitchListTile(
+                title: const Text('Keep sharing in the background'),
+                subtitle: const Text('Takes effect next time you start sharing.'),
+                value: settings.backgroundSharing,
+                onChanged: ref.read(settingsProvider.notifier).setBackgroundSharing,
+              ),
             FutureBuilder(
               future: ref.read(trackingProvider.notifier).checkAccess(),
               builder: (context, snap) => ListTile(
@@ -105,18 +107,29 @@ class RideSettingsScreen extends ConsumerWidget {
                   null => '…',
                 }),
                 trailing: const Icon(Icons.open_in_new),
-                onTap: Geolocator.openAppSettings,
+                onTap: kIsWeb ? null : Geolocator.openAppSettings,
               ),
             ),
-            const ListTile(
-              leading: Icon(Icons.battery_alert),
-              title: Text('Battery optimisation'),
-              subtitle: Text(
-                'Some phones (Xiaomi, Oppo, Vivo, Samsung…) stop background apps aggressively. If friends see you as '
-                '“Location unavailable” while your screen is off, set RideTogether’s battery usage to “Unrestricted” '
-                'in system settings. Updates while in the background are best-effort and can be delayed by the OS.',
+            if (kIsWeb)
+              const ListTile(
+                leading: Icon(Icons.phone_iphone),
+                title: Text('Using RideTogether in a browser'),
+                subtitle: Text(
+                  'Keep this page open while riding: browsers pause location when the phone is locked or you switch '
+                  'apps, and friends will then see you as “Location unavailable”. Your screen stays on while you '
+                  'share. Push notifications are not available on the web version.',
+                ),
+              )
+            else
+              const ListTile(
+                leading: Icon(Icons.battery_alert),
+                title: Text('Battery optimisation'),
+                subtitle: Text(
+                  'Some phones (Xiaomi, Oppo, Vivo, Samsung…) stop background apps aggressively. If friends see you as '
+                  '“Location unavailable” while your screen is off, set RideTogether’s battery usage to “Unrestricted” '
+                  'in system settings. Updates while in the background are best-effort and can be delayed by the OS.',
+                ),
               ),
-            ),
             const Divider(),
             Padding(
               padding: const EdgeInsets.all(16),

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/geo.dart';
+import '../../core/web_support.dart';
 import '../../domain/models.dart';
 import '../../providers.dart';
 import 'location_publisher.dart';
@@ -143,6 +144,7 @@ class TrackingController extends Notifier<TrackingState> {
       },
     );
     publisher.start(_positions(uid, rideId));
+    setScreenWakeLock(true);
     prefs.setBool(_kWasSharing, true);
     state = state.copyWith(phase: SharingPhase.sharing, clearError: true);
 
@@ -219,6 +221,7 @@ class TrackingController extends Notifier<TrackingState> {
   }
 
   Future<void> _shutdownGps() async {
+    setScreenWakeLock(false);
     _batteryTimer?.cancel();
     _batteryTimer = null;
     await _guard?.cancel();
@@ -237,31 +240,35 @@ class TrackingController extends Notifier<TrackingState> {
 
   Stream<LiveLocation> _positions(String uid, String rideId) {
     final background = ref.read(settingsProvider).backgroundSharing;
-    final LocationSettings settings = switch (defaultTargetPlatform) {
-      TargetPlatform.android => AndroidSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
-        intervalDuration: const Duration(seconds: 3),
-        foregroundNotificationConfig: background
-            ? const ForegroundNotificationConfig(
-                notificationTitle: 'Sharing your location with your ride',
-                notificationText: 'Ride members can see you. Stop sharing in the app.',
-                notificationChannelName: 'Live location sharing',
-                enableWakeLock: true,
-                setOngoing: true,
-              )
-            : null,
-      ),
-      TargetPlatform.iOS => AppleSettings(
-        accuracy: LocationAccuracy.high,
-        activityType: ActivityType.automotiveNavigation,
-        distanceFilter: 0,
-        pauseLocationUpdatesAutomatically: false,
-        allowBackgroundLocationUpdates: background,
-        showBackgroundLocationIndicator: background,
-      ),
-      _ => const LocationSettings(accuracy: LocationAccuracy.high),
-    };
+    // Browser (iPhone PWA): watchPosition. Note defaultTargetPlatform is iOS
+    // in Safari, so check kIsWeb first.
+    final LocationSettings settings = kIsWeb
+        ? const LocationSettings(accuracy: LocationAccuracy.high)
+        : switch (defaultTargetPlatform) {
+            TargetPlatform.android => AndroidSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 0,
+              intervalDuration: const Duration(seconds: 3),
+              foregroundNotificationConfig: background
+                  ? const ForegroundNotificationConfig(
+                      notificationTitle: 'Sharing your location with your ride',
+                      notificationText: 'Ride members can see you. Stop sharing in the app.',
+                      notificationChannelName: 'Live location sharing',
+                      enableWakeLock: true,
+                      setOngoing: true,
+                    )
+                  : null,
+            ),
+            TargetPlatform.iOS => AppleSettings(
+              accuracy: LocationAccuracy.high,
+              activityType: ActivityType.automotiveNavigation,
+              distanceFilter: 0,
+              pauseLocationUpdatesAutomatically: false,
+              allowBackgroundLocationUpdates: background,
+              showBackgroundLocationIndicator: background,
+            ),
+            _ => const LocationSettings(accuracy: LocationAccuracy.high),
+          };
     return Geolocator.getPositionStream(locationSettings: settings).map((p) => positionToLive(uid, p));
   }
 

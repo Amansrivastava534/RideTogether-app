@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="See your whole riding group live on one map. No more “where are you?” calls.">
+  <meta name="theme-color" content="#E8590C">
+
+  <!-- Installable on iPhone: Safari → Share → Add to Home Screen -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="RideTogether">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="manifest" href="manifest.json">
+
+  <title>RideTogether</title>
+  <style>
+    /* Same launch look as the native apps; the Flutter splash takes over from
+       this exact ring + dot. */
+    html, body { margin: 0; height: 100%; background: #E8590C; overscroll-behavior: none; }
+    #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #boot .ring { width: 72px; height: 72px; border: 8px solid #fff; border-radius: 50%;
+                  display: flex; align-items: center; justify-content: center; }
+    #boot .dot { width: 36px; height: 36px; background: #fff; border-radius: 50%; }
+  </style>
+  <script>
+    // Called from lib/core/web_support_web.dart.
+    window.rtLoadMaps = function (key) {
+      if (window.google && window.google.maps) return Promise.resolve();
+      return new Promise(function (resolve) {
+        var s = document.createElement('script');
+        s.src = 'https://maps.googleapis.com/maps/api/js?loading=async&callback=rtMapsReady&key=' + encodeURIComponent(key);
+        s.async = true;
+        window.rtMapsReady = resolve;
+        s.onerror = function () { resolve(); }; // app still runs; map shows an error tile
+        document.head.appendChild(s);
+      });
+    };
+
+    // Screen Wake Lock while sharing (Safari 16.4+). Re-acquired when the page
+    // becomes visible again, since the OS drops it when hidden.
+    (function () {
+      var wanted = false, lock = null;
+      async function acquire() {
+        if (!wanted || lock || !('wakeLock' in navigator)) return;
+        try {
+          lock = await navigator.wakeLock.request('screen');
+          lock.addEventListener('release', function () { lock = null; });
+        } catch (e) { lock = null; }
+      }
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') acquire();
+      });
+      window.rtWakeLock = function (on) {
+        wanted = on;
+        if (on) acquire(); else if (lock) { lock.release(); lock = null; }
+      };
+    })();
+  </script>
+</head>
+<body>
+  <div id="boot"><div class="ring"><div class="dot"></div></div></div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
