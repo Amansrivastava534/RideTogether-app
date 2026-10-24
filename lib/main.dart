@@ -7,7 +7,6 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
-import 'core/web_support.dart';
 import 'firebase_options.dart';
 import 'providers.dart';
 
@@ -16,10 +15,6 @@ Future<void> main() async {
   if (kIsWeb) {
     // Invite links are real paths (/j/CODE), not #fragments.
     usePathUrlStrategy();
-    // Maps JS needs its own (website-restricted) key: MAPS_WEB_API_KEY in .env.
-    await loadMapsScript(
-      const String.fromEnvironment('MAPS_WEB_API_KEY'),
-    ).timeout(const Duration(seconds: 8), onTimeout: () {});
   }
   await Firebase.initializeApp(
     // Same-origin auth handler: Safari blocks the cross-site storage that a

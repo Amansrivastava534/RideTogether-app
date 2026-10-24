@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -9,6 +10,7 @@ import '../../core/ui.dart';
 import '../../domain/models.dart';
 import '../../domain/ride_logic.dart';
 import '../../providers.dart';
+import '../map/osm_map.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -168,6 +170,17 @@ class _RouteMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (route.length < 2) return const SizedBox.shrink();
+    if (kIsWeb) {
+      return SizedBox(
+        height: 320,
+        child: OsmMap(
+          initial: route.first,
+          fitTo: route,
+          route: route,
+          pins: [(route.first, const Color(0xFF2E7D32)), (route.last, const Color(0xFFC62828))],
+        ),
+      );
+    }
     final pts = [for (final p in route) LatLng(p.lat, p.lng)];
     final bounds = LatLngBounds(
       southwest: LatLng(route.map((p) => p.lat).reduce(math.min), route.map((p) => p.lng).reduce(math.min)),

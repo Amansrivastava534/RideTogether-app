@@ -28,19 +28,6 @@
     #boot .dot { width: 36px; height: 36px; background: #fff; border-radius: 50%; }
   </style>
   <script>
-    // Called from lib/core/web_support_web.dart.
-    window.rtLoadMaps = function (key) {
-      if (window.google && window.google.maps) return Promise.resolve();
-      return new Promise(function (resolve) {
-        var s = document.createElement('script');
-        s.src = 'https://maps.googleapis.com/maps/api/js?loading=async&callback=rtMapsReady&key=' + encodeURIComponent(key);
-        s.async = true;
-        window.rtMapsReady = resolve;
-        s.onerror = function () { resolve(); }; // app still runs; map shows an error tile
-        document.head.appendChild(s);
-      });
-    };
-
     // Screen Wake Lock while sharing (Safari 16.4+). Re-acquired when the page
     // becomes visible again, since the OS drops it when hidden.
     (function () {

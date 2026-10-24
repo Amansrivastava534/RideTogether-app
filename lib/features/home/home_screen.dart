@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -7,6 +8,7 @@ import '../../domain/ride_logic.dart';
 import '../../providers.dart';
 import '../history/history_screens.dart';
 import '../map/member_tile.dart';
+import '../map/osm_map.dart';
 import '../profile/profile_screen.dart';
 import '../ride/create_ride_screen.dart';
 import '../ride/join_ride_screen.dart';
@@ -150,16 +152,31 @@ class _ActiveRideCard extends ConsumerWidget {
               SizedBox(
                 height: 140,
                 child: IgnorePointer(
-                  child: GoogleMap(
-                    liteModeEnabled: true,
-                    initialCameraPosition: CameraPosition(target: pts.first, zoom: 12),
-                    markers: {
-                      for (final l in locs.values)
-                        Marker(markerId: MarkerId(l.uid), position: LatLng(l.point.lat, l.point.lng)),
-                    },
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                  ),
+                  child: kIsWeb
+                      ? OsmMap(
+                          initial: locs.values.first.point,
+                          fitTo: [for (final l in locs.values) l.point],
+                          interactive: false,
+                          riders: [
+                            for (final l in locs.values)
+                              OsmRider(
+                                uid: l.uid,
+                                name: members.where((m) => m.uid == l.uid).firstOrNull?.name ?? '',
+                                point: l.point,
+                                live: statusOf(l, now).isLive,
+                              ),
+                          ],
+                        )
+                      : GoogleMap(
+                          liteModeEnabled: true,
+                          initialCameraPosition: CameraPosition(target: pts.first, zoom: 12),
+                          markers: {
+                            for (final l in locs.values)
+                              Marker(markerId: MarkerId(l.uid), position: LatLng(l.point.lat, l.point.lng)),
+                          },
+                          myLocationButtonEnabled: false,
+                          zoomControlsEnabled: false,
+                        ),
                 ),
               ),
             Padding(

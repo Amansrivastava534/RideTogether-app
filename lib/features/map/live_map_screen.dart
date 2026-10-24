@@ -1,8 +1,7 @@
-import 'dart:math' as math;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_map/flutter_map.dart' show MapController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,8 +14,10 @@ import '../../providers.dart';
 import '../ride/ride_flow.dart';
 import '../ride/ride_settings_screen.dart';
 import '../tracking/tracking_controller.dart';
+import 'map_camera.dart';
 import 'map_panel.dart';
 import 'marker_icons.dart';
+import 'osm_map.dart';
 
 const _animDuration = Duration(milliseconds: 900);
 
@@ -46,7 +47,10 @@ class LiveMapScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTickerProviderStateMixin {
-  GoogleMapController? _map;
+  // Google Maps on Android/iOS; OpenStreetMap on the web (no key there).
+  GoogleMapController? _gmap;
+  final _osm = MapController();
+  RideCamera? _cam;
   final _icons = MarkerIcons();
   final _detector = FallBehindDetector();
   final _anims = <String, _Anim>{};
@@ -79,7 +83,8 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
   @override
   void dispose() {
     _ticker.dispose();
-    _map?.dispose();
+    _gmap?.dispose();
+    _osm.dispose();
     super.dispose();
   }
 
@@ -149,27 +154,20 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
       showSnack(context, 'Your location isn’t available yet. Start sharing to see yourself.');
       return;
     }
-    _map?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(p.lat, p.lng), 15));
+    _cam?.moveTo(p, zoom: 15);
   }
 
   void _fitAll(Map<String, LiveLocation> locs) {
     final pts = [for (final l in locs.values) l.point, ?_myPoint(locs)];
-    if (pts.isEmpty) return;
-    if (pts.length == 1) {
-      _map?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(pts.first.lat, pts.first.lng), 14));
-      return;
-    }
-    final bounds = LatLngBounds(
-      southwest: LatLng(pts.map((p) => p.lat).reduce(math.min), pts.map((p) => p.lng).reduce(math.min)),
-      northeast: LatLng(pts.map((p) => p.lat).reduce(math.max), pts.map((p) => p.lng).reduce(math.max)),
-    );
-    _map?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 72));
+    final h = MediaQuery.sizeOf(context).height;
+    // Keep riders clear of the top bar and the bottom panel.
+    _cam?.fit(pts, padding: EdgeInsets.fromLTRB(48, 150, 72, h * panelInitialSize + 48));
   }
 
   void _select(String uid, Map<String, LiveLocation> locs) {
     setState(() => _selected = uid);
     final p = locs[uid]?.point;
-    if (p != null) _map?.animateCamera(CameraUpdate.newLatLng(LatLng(p.lat, p.lng)));
+    if (p != null) _cam?.moveTo(p);
   }
 
   // --- navigation hand-off ------------------------------------------------
@@ -225,6 +223,21 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
     return out;
   }
 
+  /// Web markers. Includes ourselves, since browsers get no native blue dot.
+  List<OsmRider> _osmRiders(List<RideMember> members, Map<String, LiveLocation> locs, DateTime now) => [
+    for (final m in members)
+      if (locs[m.uid] case final l?)
+        OsmRider(
+          uid: m.uid,
+          name: m.name,
+          point: _displayed(m.uid, locs, now)!,
+          live: statusOf(l, now).isLive,
+          heading: statusOf(l, now).isLive ? l.heading : null,
+          selected: m.uid == _selected,
+          onTap: () => _select(m.uid, locs),
+        ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final rideId = widget.rideId;
@@ -241,7 +254,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
       final n = next.value?.locations;
       if (n == null) return;
       _onLocations(prev?.value?.locations, n);
-      if (!_fitted && n.isNotEmpty && _map != null) {
+      if (!_fitted && n.isNotEmpty && _cam != null) {
         _fitted = true;
         _fitAll(n);
       }
@@ -267,28 +280,48 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
       child: Scaffold(
         body: Stack(
           children: [
-            GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: LatLng(initial.lat, initial.lng),
-                zoom: myPoint == null ? 5 : 14,
+            if (kIsWeb)
+              OsmMap(
+                controller: _osm,
+                initial: initial,
+                initialZoom: myPoint == null && locs.isEmpty ? 5 : 14,
+                riders: _osmRiders(active, locs, now),
+                attributionBottom: h * panelInitialSize,
+                onMapTap: () => setState(() => _selected = null),
+                onReady: () {
+                  _cam = OsmCamera(_osm);
+                  if (locs.isNotEmpty && !_fitted) {
+                    _fitted = true;
+                    // Next frame: moving the camera before the tile layer's
+                    // first frame leaves flutter_map's tiles stuck (grey).
+                    WidgetsBinding.instance.addPostFrameCallback((_) => _fitAll(locs));
+                  }
+                },
+              )
+            else
+              GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(initial.lat, initial.lng),
+                  zoom: myPoint == null && locs.isEmpty ? 5 : 14,
+                ),
+                onMapCreated: (c) {
+                  _gmap = c;
+                  _cam = GoogleCamera(c);
+                  if (locs.isNotEmpty && !_fitted) {
+                    _fitted = true;
+                    _fitAll(locs);
+                  }
+                },
+                style: dark ? _darkMapStyle : null,
+                markers: _markers(active, locs, now, me),
+                myLocationEnabled: _locationGranted && !kIsWeb,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+                mapToolbarEnabled: false,
+                compassEnabled: true,
+                onTap: (_) => setState(() => _selected = null),
+                padding: EdgeInsets.only(bottom: h * panelInitialSize, top: 110),
               ),
-              onMapCreated: (c) {
-                _map = c;
-                if (locs.isNotEmpty && !_fitted) {
-                  _fitted = true;
-                  _fitAll(locs);
-                }
-              },
-              style: dark ? _darkMapStyle : null,
-              markers: _markers(active, locs, now, me),
-              myLocationEnabled: _locationGranted && !kIsWeb,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: true,
-              onTap: (_) => setState(() => _selected = null),
-              padding: EdgeInsets.only(bottom: h * panelInitialSize, top: 110),
-            ),
             SafeArea(
               child: Column(
                 children: [
@@ -316,16 +349,8 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> with SingleTicker
               bottom: h * panelInitialSize + 12,
               child: Column(
                 children: [
-                  _MapButton(
-                    icon: Icons.add,
-                    tooltip: 'Zoom in',
-                    onTap: () => _map?.animateCamera(CameraUpdate.zoomIn()),
-                  ),
-                  _MapButton(
-                    icon: Icons.remove,
-                    tooltip: 'Zoom out',
-                    onTap: () => _map?.animateCamera(CameraUpdate.zoomOut()),
-                  ),
+                  _MapButton(icon: Icons.add, tooltip: 'Zoom in', onTap: () => _cam?.zoomBy(1)),
+                  _MapButton(icon: Icons.remove, tooltip: 'Zoom out', onTap: () => _cam?.zoomBy(-1)),
                   const SizedBox(height: 8),
                   _MapButton(icon: Icons.groups, tooltip: 'Show everyone', onTap: () => _fitAll(locs)),
                   _MapButton(icon: Icons.my_location, tooltip: 'Center on me', onTap: () => _centerOnMe(locs)),

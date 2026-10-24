@@ -352,13 +352,9 @@ What differs from the native apps:
 - Location is shared **only while the page is open**. The screen is kept awake while sharing (Screen Wake Lock); locking the phone or switching apps pauses updates and friends see *Location unavailable / Last seen*.
 - No push notifications (SOS and join requests appear in-app while open).
 - Google sign-in uses a full-page redirect on the same domain (Safari-safe); guests work as usual.
-- Your own position is drawn as your marker (no native blue dot).
+- Your own position is drawn as your marker (no native blue dot), and the map is OpenStreetMap instead of Google Maps.
 
-Setup: enable **Maps JavaScript API**, create a key restricted to *Websites* `https://ridetogether-4590.web.app/*`, `https://ridetogether-4590.firebaseapp.com/*`, `http://localhost/*` and API *Maps JavaScript API*, then:
-
-```bash
-echo "MAPS_WEB_API_KEY=YOUR_WEB_KEY" >> .env
-```
+The web map uses **OpenStreetMap** (via `flutter_map`) — free, no API key or billing; the Android/iOS apps keep Google Maps. OSM tiles require the on-map attribution (shown) and light use, which a riding group is well within ([tile policy](https://operations.osmfoundation.org/policies/tiles/)).
 
 Deploy (the `predeploy` hook runs `flutter build web --release --dart-define-from-file=.env`):
 
@@ -423,7 +419,7 @@ Verified so far (Oct 2026): unit tests (30) and rules tests (23) pass; Android r
 
 Not yet verified / pending:
 - Blaze plan → TTL policies and Cloud Functions (push) are written and emulator-tested but **not deployed**.
-- Web app deployed to https://ridetogether-4590.web.app; the map needs `MAPS_WEB_API_KEY` in `.env` and a redeploy. Location sharing in a real iPhone Safari not yet verified.
+- Web app deployed to https://ridetogether-4590.web.app (OpenStreetMap). Location sharing in a real iPhone Safari not yet verified.
 - Release signing uses the debug key until `android/key.properties` is set up.
 - iOS not built (no Xcode on the dev Mac).
 - Two real phones riding apart, background delivery with screen off, SOS push — use the checklist above.
