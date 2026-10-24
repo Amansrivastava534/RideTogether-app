@@ -29,7 +29,9 @@ class GoogleCamera implements RideCamera {
   @override
   void fit(List<Coord> pts, {required EdgeInsets padding}) {
     if (pts.isEmpty) return;
-    if (pts.length == 1) return moveTo(pts.first, zoom: 14);
+    // One rider, or everyone within a few hundred metres: a bounds fit would
+    // zoom to building level, so use a sensible street zoom instead.
+    if (pts.every((p) => distanceMeters(p, pts.first) < 300)) return moveTo(pts.first, zoom: 15);
     _c.animateCamera(
       CameraUpdate.newLatLngBounds(
         LatLngBounds(
